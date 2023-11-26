@@ -1,10 +1,10 @@
 import React, { Component } from "react";
-import axios from "axios";
 import SearchBar from "./SearchBar";
 import ImageGallery from "./ImageGallery";
 import Button from "./Button";
 import CustomLoader from "./CustomLoader";
 import Modal from "./Modal";
+import { getImg } from "services/api";
 
 class App extends Component {
   state = {
@@ -12,34 +12,13 @@ class App extends Component {
     query: "",
     page: 1,
     largeImageURL: "",
+    tags: "",
     showModal: false,
     isLoading: false,
+    error: null,
   };
 
-  handleSearchSubmit = (query) => {
-    this.setState({ query, page: 1, images: [] }, this.fetchImages);
-  };
-
-  handleLoadMore = () => {
-    this.setState(
-      (prevState) => ({ page: prevState.page + 1 }),
-      this.fetchImages
-    );
-  };
-
-  handleImageClick = (largeImageURL) => {
-    this.setState({ largeImageURL, showModal: true });
-  };
-
-  handleCloseModal = () => {
-    this.setState({ largeImageURL: "", showModal: false });
-  };
-
-  componentDidMount() {
-    document.addEventListener("keydown", this.handleKeyDown);
-  }
-
-  componentDidUpdate(prevProps, prevState) {
+  componentDidUpdate(_, prevState) {
     if (
       this.state.page !== prevState.page ||
       this.state.query !== prevState.query
@@ -48,35 +27,43 @@ class App extends Component {
     }
   }
 
-  componentWillUnmount() {
-    document.removeEventListener("keydown", this.handleKeyDown);
-  }
-
-  handleKeyDown = (e) => {
-    if (e.code === "Escape") {
-      this.setState({ showModal: false });
-    }
-  };
-
-  fetchImages = () => {
+  fetchImages = async () => {
     const { query, page } = this.state;
-    const apiKey = "40627686-9640a27f07dc80035c86fc9a3";
 
     this.setState({ isLoading: true });
 
-    axios
-      .get(
-        `https://pixabay.com/api/?q=${query}&page=${page}&key=${apiKey}&image_type=photo&orientation=horizontal&per_page=12`
-      )
-      .then((response) => {
-        const totalHits = response.data.totalHits;
-        this.setState((prevState) => ({
-          images: [...prevState.images, ...response.data.hits],
-          loadMore: prevState.page < Math.ceil(totalHits / 12),
-        }));
-      })
-      .catch((error) => console.error("Error fetching images:", error))
-      .finally(() => this.setState({ isLoading: false }));
+    try {
+      const { hits, totalHits } = await getImg(query, page);
+
+      if (hits.length === 0) {
+        return alert("Don't found");
+      }
+
+      this.setState((prevState) => ({
+        images: [...prevState.images, ...hits],
+        loadMore: prevState.page < Math.ceil(totalHits / 12),
+      }));
+    } catch (error) {
+      this.setState({ error: error.message });
+    } finally {
+      this.setState({ isLoading: false });
+    }
+  };
+
+  handleSearchSubmit = (query) => {
+    this.setState({ query, page: 1, images: [] });
+  };
+
+  handleLoadMore = () => {
+    this.setState((prevState) => ({ page: prevState.page + 1 }));
+  };
+
+  handleImageClick = (largeImageURL, tags) => {
+    this.setState({ largeImageURL, showModal: true, tags });
+  };
+
+  handleCloseModal = () => {
+    this.setState({ largeImageURL: "", tags: "", showModal: false });
   };
 
   render() {
@@ -84,22 +71,32 @@ class App extends Component {
       images,
       showModal,
       largeImageURL,
+      tags,
       isLoading,
       loadMore,
+      error,
     } = this.state;
 
     return (
       <div className="App">
         <SearchBar onSubmit={this.handleSearchSubmit} />
-        <ImageGallery images={images} onImageClick={this.handleImageClick} />
+
+        {images.length > 0 && (
+          <ImageGallery images={images} onImageClick={this.handleImageClick} />
+        )}
+
+        {error && <p>Something went wrong...</p>}
 
         {isLoading && <CustomLoader />}
 
-        {loadMore && <Button onClick={this.handleLoadMore}>Load more</Button>}
+        {loadMore && !isLoading && images.length > 0 && (
+          <Button onClick={this.handleLoadMore}>Load more</Button>
+        )}
 
         {showModal && (
           <Modal
             largeImageURL={largeImageURL}
+            tags={tags}
             onClose={this.handleCloseModal}
           />
         )}

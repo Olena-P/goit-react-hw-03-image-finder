@@ -8,7 +8,7 @@ const ImageGalleryItem = ({ image, onClick }) => {
         src={image.webformatURL}
         alt={image.tags}
         className="ImageGalleryItem-image"
-        onClick={() => onClick(image.largeImageURL)}
+        onClick={() => onClick(image.largeImageURL, image.tags)}
       />
     </li>
   );
