@@ -35,6 +35,29 @@ class App extends Component {
     this.setState({ largeImageURL: "", showModal: false });
   };
 
+  componentDidMount() {
+    document.addEventListener("keydown", this.handleKeyDown);
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    if (
+      this.state.page !== prevState.page ||
+      this.state.query !== prevState.query
+    ) {
+      this.fetchImages();
+    }
+  }
+
+  componentWillUnmount() {
+    document.removeEventListener("keydown", this.handleKeyDown);
+  }
+
+  handleKeyDown = (e) => {
+    if (e.code === "Escape") {
+      this.setState({ showModal: false });
+    }
+  };
+
   fetchImages = () => {
     const { query, page } = this.state;
     const apiKey = "40627686-9640a27f07dc80035c86fc9a3";
@@ -46,8 +69,10 @@ class App extends Component {
         `https://pixabay.com/api/?q=${query}&page=${page}&key=${apiKey}&image_type=photo&orientation=horizontal&per_page=12`
       )
       .then((response) => {
+        const totalHits = response.data.totalHits;
         this.setState((prevState) => ({
           images: [...prevState.images, ...response.data.hits],
+          loadMore: prevState.page < Math.ceil(totalHits / 12),
         }));
       })
       .catch((error) => console.error("Error fetching images:", error))
@@ -55,7 +80,13 @@ class App extends Component {
   };
 
   render() {
-    const { images, showModal, largeImageURL, isLoading } = this.state;
+    const {
+      images,
+      showModal,
+      largeImageURL,
+      isLoading,
+      loadMore,
+    } = this.state;
 
     return (
       <div className="App">
@@ -64,9 +95,7 @@ class App extends Component {
 
         {isLoading && <CustomLoader />}
 
-        {images.length > 0 && !isLoading && (
-          <Button onClick={this.handleLoadMore}>Load more</Button>
-        )}
+        {loadMore && <Button onClick={this.handleLoadMore}>Load more</Button>}
 
         {showModal && (
           <Modal
